@@ -42,7 +42,7 @@ function makeRequest (method, url) {
                  cast.framework.messages.GenericMediaMetadata();
               metadata.title = item.title;
               metadata.subtitle = item.author;
-              
+
               // Adjusting request to make requested content playable
               request.media.contentUrl = item.stream.dash;
               request.media.contentType = 'application/dash+xml';
@@ -55,4 +55,23 @@ function makeRequest (method, url) {
         });
       });
 
-context.start();
+// Optimizing for smart displays
+const touchControls = cast.framework.ui.Controls.getInstance();
+
+const playerData = new cast.framework.ui.PlayerData();
+const playerDataBinder = new cast.framework.ui.PlayerDataBinder(playerData);
+
+playerDataBinder.addEventListener(
+  cast.framework.ui.PlayerDataEventType.MEDIA_CHANGED,
+  (e) => {
+    if (!e.value) return;
+
+    // Clear default buttons and re-assign
+    touchControls.clearDefaultSlotAssignments();
+    touchControls.assignButton(
+      cast.framework.ui.ControlsSlot.SLOT_PRIMARY_1,
+      cast.framework.ui.ControlsButton.SEEK_BACKWARD_30
+    );
+  });
+
+context.start({ touchScreenOptimizedApp: true });
