@@ -29,6 +29,11 @@ function makeRequest (method, url) {
   playerManager.setMessageInterceptor(
       cast.framework.messages.MessageType.LOAD,
       request => {
+        // Map contentId to entity
+        if (request.media && request.media.entity) {
+            request.media.contentId = request.media.entity;
+        }
+        
         return new Promise((resolve, reject) => {
           // Fetch content repository by requested contentId
           makeRequest('GET', 'https://storage.googleapis.com/cpe-sample-media/content.json').then(function (data) {
@@ -57,9 +62,32 @@ function makeRequest (method, url) {
 
 // Optimizing for smart displays
 const touchControls = cast.framework.ui.Controls.getInstance();
-
 const playerData = new cast.framework.ui.PlayerData();
 const playerDataBinder = new cast.framework.ui.PlayerDataBinder(playerData);
+
+let browseItems = getBrowseItems();
+
+function getBrowseItems() {
+  let browseItems = [];
+  makeRequest('GET', 'https://storage.googleapis.com/cpe-sample-media/content.json')
+  .then(function (data) {
+    for (let key in data) {
+      let item = new cast.framework.ui.BrowseItem();
+      item.entity = key;
+      item.title = data[key].title;
+      item.subtitle = data[key].description;
+      item.image = new cast.framework.messages.Image(data[key].poster);
+      item.imageType = cast.framework.ui.BrowseImageType.MOVIE;
+      browseItems.push(item);
+    }
+  });
+  return browseItems;
+}
+
+let browseContent = new cast.framework.ui.BrowseContent();
+browseContent.title = 'Up Next';
+browseContent.items = browseItems;
+browseContent.targetAspectRatio = cast.framework.ui.BrowseImageAspectRatio.LANDSCAPE_16_TO_9;
 
 playerDataBinder.addEventListener(
   cast.framework.ui.PlayerDataEventType.MEDIA_CHANGED,
@@ -72,6 +100,9 @@ playerDataBinder.addEventListener(
       cast.framework.ui.ControlsSlot.SLOT_PRIMARY_1,
       cast.framework.ui.ControlsButton.SEEK_BACKWARD_30
     );
+
+    // Media browse
+    touchControls.setBrowseContent(browseContent);
   });
 
 context.start({ touchScreenOptimizedApp: true });
