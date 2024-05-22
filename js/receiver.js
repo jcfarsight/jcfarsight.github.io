@@ -2,6 +2,34 @@
 const context = cast.framework.CastReceiverContext.getInstance();
 const playerManager = context.getPlayerManager();
 
+// Debug Logger
+const castDebugLogger = cast.debug.CastDebugLogger.getInstance();
+const LOG_TAG = 'MyAPP.LOG';
+
+// Enable debug logger and show a 'DEBUG MODE' overlay at top left corner.
+context.addEventListener(cast.framework.system.EventType.READY, () => {
+  if (!castDebugLogger.debugOverlayElement_) {
+      castDebugLogger.setEnabled(true);
+
+      // Show debug overlay
+      castDebugLogger.showDebugLogs(true);
+
+      // Clear log messages on debug overlay
+      castDebugLogger.clearDebugLogs();      
+  }
+});
+
+// Set verbosity level for Core events.
+castDebugLogger.loggerLevelByEvents = {
+    'cast.framework.events.category.CORE': cast.framework.LoggerLevel.INFO,
+    'cast.framework.events.EventType.MEDIA_STATUS': cast.framework.LoggerLevel.DEBUG
+  }
+
+// Set verbosity level for custom tags.
+castDebugLogger.loggerLevelByTags = {
+    [LOG_TAG]: cast.framework.LoggerLevel.DEBUG,
+};
+
 function makeRequest (method, url) {
     return new Promise(function (resolve, reject) {
       let xhr = new XMLHttpRequest();
@@ -29,28 +57,34 @@ function makeRequest (method, url) {
   playerManager.setMessageInterceptor(
       cast.framework.messages.MessageType.LOAD,
       request => {
+        castDebugLogger.info(LOG_TAG, 'Intercepting LOAD request');
+
         // Map contentId to entity
         if (request.media && request.media.entity) {
             request.media.contentId = request.media.entity;
         }
-        
+
         return new Promise((resolve, reject) => {
           // Fetch content repository by requested contentId
           makeRequest('GET', 'https://storage.googleapis.com/cpe-sample-media/content.json').then(function (data) {
             let item = data[request.media.contentId];
             if(!item) {
               // Content could not be found in repository
+              castDebugLogger.error(LOG_TAG, 'Content not found');
               reject();
             } else {
+              castDebugLogger.warn(LOG_TAG, 'Playable URL:', request.media.contentUrl);
+
+              // Adjusting request to make requested content playable
+              request.media.contentUrl = item.stream.dash;
+              request.media.contentType = 'application/dash+xml';
+
               // Add metadata
               let metadata = new
                  cast.framework.messages.GenericMediaMetadata();
               metadata.title = item.title;
               metadata.subtitle = item.author;
 
-              // Adjusting request to make requested content playable
-              request.media.contentUrl = item.stream.dash;
-              request.media.contentType = 'application/dash+xml';
               request.media.metadata = metadata;
   
               // Resolve request
